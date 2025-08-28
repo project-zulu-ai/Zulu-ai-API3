@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Dict
+from models import AppIdea
+from code_generator import generate_app
 
 app = FastAPI(
     title="Zulu AI - App Generator API",
@@ -8,55 +8,38 @@ app = FastAPI(
     version="1.0.0"
 )
 
-class AppIdeaRequest(BaseModel):
-    idea: str
-
-class AppGeneratorResponse(BaseModel):
-    frontend: Dict[str, str]
-    backend: Dict[str, str]
-    readme: str
-
 @app.get("/")
 async def root():
     """Health check endpoint"""
     return {"message": "Zulu AI App Generator API is running"}
 
-@app.post("/generate_app", response_model=AppGeneratorResponse)
-async def generate_app(request: AppIdeaRequest):
+@app.post("/generate_app")
+async def generate_app_endpoint(app_idea: AppIdea):
     """
     Generate app starter code based on user idea
     
     Args:
-        request: AppIdeaRequest containing the app idea
+        app_idea: AppIdea model containing the app idea
         
     Returns:
-        AppGeneratorResponse with generated code files
+        Dictionary with file paths and code content
     """
     # Validate input
-    if not request.idea or len(request.idea.strip()) == 0:
+    if not app_idea.idea or len(app_idea.idea.strip()) == 0:
         raise HTTPException(
             status_code=400,
             detail="App idea cannot be empty"
         )
     
-    idea = request.idea.strip()
-    
-    # Generate placeholder code
-    frontend_files = {
-        "App.js": "// React code placeholder"
-    }
-    
-    backend_files = {
-        "main.py": "# FastAPI backend placeholder"
-    }
-    
-    readme_content = f"# {idea}\n\nGenerated app starter by Zulu AI"
-    
-    return AppGeneratorResponse(
-        frontend=frontend_files,
-        backend=backend_files,
-        readme=readme_content
-    )
+    try:
+        # Generate the app files
+        generated_files = generate_app(app_idea.idea.strip())
+        return generated_files
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate app: {str(e)}"
+        )
 
 if __name__ == "__main__":
     import uvicorn
