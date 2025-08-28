@@ -1,0 +1,211 @@
+const { useState, useEffect } = React;
+
+function App() {
+    const [{{ metadata.app_type }}s, set{{ metadata.app_type.title() }}s] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // API base URL
+    const API_BASE = 'http://localhost:8000';
+
+    // Fetch {{ metadata.app_type }}s from API
+    const fetch{{ metadata.app_type.title() }}s = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_BASE}/{{ metadata.api_endpoints[0] }}`);
+            if (!response.ok) throw new Error('Failed to fetch {{ metadata.app_type }}s');
+            const data = await response.json();
+            set{{ metadata.app_type.title() }}s(data);
+            setError('');
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Load {{ metadata.app_type }}s on component mount
+    useEffect(() => {
+        fetch{{ metadata.app_type.title() }}s();
+    }, []);
+
+    {% if metadata.app_type == 'todo' %}
+    // Add new task
+    const addTask = async (title, description = '') => {
+        try {
+            const response = await fetch(`${API_BASE}/tasks`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ title, description }),
+            });
+            if (!response.ok) throw new Error('Failed to create task');
+            await fetchTasks(); // Refresh list
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    // Toggle task completion
+    const toggleTask = async (taskId, completed) => {
+        try {
+            const response = await fetch(`${API_BASE}/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ completed: !completed }),
+            });
+            if (!response.ok) throw new Error('Failed to update task');
+            await fetchTasks(); // Refresh list
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    // Delete task
+    const deleteTask = async (taskId) => {
+        try {
+            const response = await fetch(`${API_BASE}/tasks/${taskId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error('Failed to delete task');
+            await fetchTasks(); // Refresh list
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    {% elif metadata.app_type == 'blog' %}
+    // Add new post
+    const addPost = async (title, content, author = 'Admin') => {
+        try {
+            const response = await fetch(`${API_BASE}/posts`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ title, content, author }),
+            });
+            if (!response.ok) throw new Error('Failed to create post');
+            await fetchPosts(); // Refresh list
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    // Delete post
+    const deletePost = async (postId) => {
+        try {
+            const response = await fetch(`${API_BASE}/posts/${postId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error('Failed to delete post');
+            await fetchPosts(); // Refresh list
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    {% elif metadata.app_type == 'note' %}
+    // Add new note
+    const addNote = async (title, content) => {
+        try {
+            const response = await fetch(`${API_BASE}/notes`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ title, content }),
+            });
+            if (!response.ok) throw new Error('Failed to create note');
+            await fetchNotes(); // Refresh list
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    // Delete note
+    const deleteNote = async (noteId) => {
+        try {
+            const response = await fetch(`${API_BASE}/notes/${noteId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error('Failed to delete note');
+            await fetchNotes(); // Refresh list
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    {% else %}
+    // Add new item
+    const addItem = async (name, description = '') => {
+        try {
+            const response = await fetch(`${API_BASE}/items`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name, description }),
+            });
+            if (!response.ok) throw new Error('Failed to create item');
+            await fetchItems(); // Refresh list
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    // Delete item
+    const deleteItem = async (itemId) => {
+        try {
+            const response = await fetch(`${API_BASE}/items/${itemId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error('Failed to delete item');
+            await fetchItems(); // Refresh list
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+    {% endif %}
+
+    return (
+        <div className="min-h-screen bg-gray-100 py-8 px-4">
+            <div className="max-w-4xl mx-auto">
+                <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
+                    {{ metadata.app_name.replace('_', ' ').title() }}
+                </h1>
+
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                        {error}
+                    </div>
+                )}
+
+                <{{ metadata.app_type.title() }}Component
+                    {{ metadata.app_type }}s={ {{ metadata.app_type }}s}
+                    loading={loading}
+                    {% if metadata.app_type == 'todo' %}
+                    onAdd={addTask}
+                    onToggle={toggleTask}
+                    onDelete={deleteTask}
+                    {% elif metadata.app_type == 'blog' %}
+                    onAdd={addPost}
+                    onDelete={deletePost}
+                    {% elif metadata.app_type == 'note' %}
+                    onAdd={addNote}
+                    onDelete={deleteNote}
+                    {% else %}
+                    onAdd={addItem}
+                    onDelete={deleteItem}
+                    {% endif %}
+                />
+            </div>
+        </div>
+    );
+}
+
+// Render the app
+ReactDOM.render(<App />, document.getElementById('root'));

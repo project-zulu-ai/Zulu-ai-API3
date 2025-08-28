@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ metadata.app_name.replace('_', ' ').title() }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen py-8 px-4">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-900 mb-8 text-center">
+            {{ metadata.app_name.replace('_', ' ').title() }}
+        </h1>
+
+        <!-- Error display -->
+        <div id="error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"></div>
+
+        <!-- Add form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Add New {{ metadata.app_type.title() }}</h2>
+            <form id="add-form" class="space-y-4">
+                {% if metadata.app_type == 'todo' %}
+                <input
+                    type="text"
+                    id="title"
+                    placeholder="Task title"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                />
+                <textarea
+                    id="description"
+                    placeholder="Task description (optional)"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows="3"
+                ></textarea>
+                {% elif metadata.app_type == 'blog' %}
+                <input
+                    type="text"
+                    id="title"
+                    placeholder="Post title"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                />
+                <input
+                    type="text"
+                    id="author"
+                    placeholder="Author (optional)"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <textarea
+                    id="content"
+                    placeholder="Post content"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows="6"
+                    required
+                ></textarea>
+                {% else %}
+                <input
+                    type="text"
+                    id="name"
+                    placeholder="Item name"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                />
+                <textarea
+                    id="description"
+                    placeholder="Item description (optional)"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows="3"
+                ></textarea>
+                {% endif %}
+                <button
+                    type="submit"
+                    class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    Add {{ metadata.app_type.title() }}
+                </button>
+            </form>
+        </div>
+
+        <!-- Items list -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">{{ metadata.app_type.title() }}s</h2>
+            <div id="loading" class="text-center py-4 hidden">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <p class="mt-2 text-gray-600">Loading...</p>
+            </div>
+            <div id="empty-state" class="text-gray-500 text-center py-4 hidden">
+                No {{ metadata.app_type }}s found. Add one above!
+            </div>
+            <div id="items-list" class="space-y-3"></div>
+        </div>
+    </div>
+
+    <script>
+        // API configuration
+        const API_BASE = 'http://localhost:8000';
+        const API_ENDPOINT = '{{ metadata.api_endpoints[0] }}';
+
+        // DOM elements
+        const addForm = document.getElementById('add-form');
+        const itemsList = document.getElementById('items-list');
+        const loading = document.getElementById('loading');
+        const emptyState = document.getElementById('empty-state');
+        const errorDiv = document.getElementById('error');
+
+        // State
+        let items = [];
+
+        // Utility functions
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorDiv.classList.add('hidden');
+        }
+
+        function showLoading() {
+            loading.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+        }
+
+        function hideLoading() {
+            loading.classList.add('hidden');
+        }
+
+        // API functions
+        async function fetchItems() {
+            showLoading();
+            hideError();
+            
+            try {
+                const response = await fetch(`${API_BASE}${API_ENDPOINT}`);
+                if (!response.ok) throw new Error('Failed to fetch items');
+                
+                items = await response.json();
+                renderItems();
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function addItem(data) {
+            try {
+                const response = await fetch(`${API_BASE}${API_ENDPOINT}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                });
+                
+                if (!response.ok) throw new Error('Failed to add item');
+                
+                // Clear form
+                addForm.reset();
+                
+                // Refresh list
+                await fetchItems();
+                hideError();
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        async function deleteItem(id) {
+            try {
+                const response = await fetch(`${API_BASE}${API_ENDPOINT}/${id}`, {
+                    method: 'DELETE',
+                });
+                
+                if (!response.ok) throw new Error('Failed to delete item');
+                
+                // Refresh list
+                await fetchItems();
+                hideError();
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        {% if metadata.app_type == 'todo' %}
+        async function toggleTask(id, completed) {
+            try {
+                const response = await fetch(`${API_BASE}${API_ENDPOINT}/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ completed: !completed }),
+                });
+                
+                if (!response.ok) throw new Error('Failed to update task');
+                
+                // Refresh list
+                await fetchItems();
+                hideError();
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+        {% endif %}
+
+        // Render functions
+        function renderItems() {
+            if (items.length === 0) {
+                itemsList.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            
+            itemsList.innerHTML = items.map(item => `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            {% if metadata.app_type == 'todo' %}
+                            <div class="flex items-center space-x-3">
+                                <input
+                                    type="checkbox"
+                                    ${item.completed ? 'checked' : ''}
+                                    onchange="toggleTask(${item.id}, ${item.completed})"
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                                <h3 class="text-lg font-medium ${item.completed ? 'line-through text-gray-500' : 'text-gray-900'}">
+                                    ${item.title}
+                                </h3>
+                            </div>
+                            ${item.description ? `
+                                <p class="mt-2 ml-7 ${item.completed ? 'text-gray-400' : 'text-gray-600'}">
+                                    ${item.description}
+                                </p>
+                            ` : ''}
+                            <p class="mt-2 ml-7 text-sm text-gray-400">
+                                Created: ${new Date(item.created_at).toLocaleDateString()}
+                            </p>
+                            {% elif metadata.app_type == 'blog' %}
+                            <h3 class="text-lg font-medium text-gray-900">${item.title}</h3>
+                            <p class="mt-1 text-sm text-gray-500">By ${item.author} • ${new Date(item.created_at).toLocaleDateString()}</p>
+                            <p class="mt-2 text-gray-600">${item.content.substring(0, 200)}${item.content.length > 200 ? '...' : ''}</p>
+                            {% else %}
+                            <h3 class="text-lg font-medium text-gray-900">${item.name}</h3>
+                            ${item.description ? `<p class="mt-2 text-gray-600">${item.description}</p>` : ''}
+                            <p class="mt-2 text-sm text-gray-400">
+                                Created: ${new Date(item.created_at).toLocaleDateString()}
+                            </p>
+                            {% endif %}
+                        </div>
+                        <button
+                            onclick="deleteItem(${item.id})"
+                            class="ml-4 text-red-500 hover:text-red-700 focus:outline-none"
+                            title="Delete item"
+                        >
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Event listeners
+        addForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            {% if metadata.app_type == 'todo' %}
+            const title = document.getElementById('title').value.trim();
+            const description = document.getElementById('description').value.trim();
+            
+            if (title) {
+                await addItem({ title, description });
+            }
+            {% elif metadata.app_type == 'blog' %}
+            const title = document.getElementById('title').value.trim();
+            const content = document.getElementById('content').value.trim();
+            const author = document.getElementById('author').value.trim() || 'Admin';
+            
+            if (title && content) {
+                await addItem({ title, content, author });
+            }
+            {% else %}
+            const name = document.getElementById('name').value.trim();
+            const description = document.getElementById('description').value.trim();
+            
+            if (name) {
+                await addItem({ name, description });
+            }
+            {% endif %}
+        });
+
+        // Initialize app
+        fetchItems();
+    </script>
+</body>
+</html>

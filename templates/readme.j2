@@ -1,0 +1,13 @@
+# {{ metadata.app_name.replace('_', ' ').title() }}
+
+A {{ metadata.app_type }} application built with FastAPI backend and {{ 'React' if metadata.frontend_type == 'react' else 'HTML/JavaScript' }} frontend.
+
+## Original Idea
+{{ original_idea }}
+
+## Features
+{% for feature in metadata.features %}
+- {{ feature.replace('_', ' ').title() }}
+{% endfor %}
+
+## Project Structure

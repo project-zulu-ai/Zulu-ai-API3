@@ -1,0 +1,397 @@
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
+import sqlite3
+import os
+from datetime import datetime
+
+# Initialize FastAPI app
+app = FastAPI(title="{{ metadata.app_name.replace('_', ' ').title() }} API")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Database setup
+DATABASE_URL = "{{ metadata.app_name }}.db"
+
+def init_db():
+    """Initialize the database with required tables"""
+    conn = sqlite3.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    
+    {% if metadata.app_type == 'todo' %}
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            completed BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    {% elif metadata.app_type == 'blog' %}
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            author TEXT DEFAULT 'Admin',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    {% elif metadata.app_type == 'note' %}
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    {% else %}
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    {% endif %}
+    
+    conn.commit()
+    conn.close()
+
+# Initialize database on startup
+init_db()
+
+# Pydantic models
+{% if metadata.app_type == 'todo' %}
+class TaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+
+class Task(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    completed: bool
+    created_at: str
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    completed: Optional[bool] = None
+
+{% elif metadata.app_type == 'blog' %}
+class PostCreate(BaseModel):
+    title: str
+    content: str
+    author: Optional[str] = "Admin"
+
+class Post(BaseModel):
+    id: int
+    title: str
+    content: str
+    author: str
+    created_at: str
+
+{% elif metadata.app_type == 'note' %}
+class NoteCreate(BaseModel):
+    title: str
+    content: str
+
+class Note(BaseModel):
+    id: int
+    title: str
+    content: str
+    created_at: str
+    updated_at: str
+
+class NoteUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+{% else %}
+class ItemCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class Item(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    created_at: str
+{% endif %}
+
+# Database helper functions
+def get_db_connection():
+    """Get database connection"""
+    conn = sqlite3.connect(DATABASE_URL)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# API Routes
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "{{ metadata.app_name.replace('_', ' ').title() }} API is running"}
+
+{% if metadata.app_type == 'todo' %}
+@app.get("/tasks", response_model=List[Task])
+async def get_tasks():
+    """Get all tasks"""
+    conn = get_db_connection()
+    tasks = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(task) for task in tasks]
+
+@app.post("/tasks", response_model=Task)
+async def create_task(task: TaskCreate):
+    """Create a new task"""
+    conn = get_db_connection()
+    cursor = conn.execute(
+        "INSERT INTO tasks (title, description) VALUES (?, ?)",
+        (task.title, task.description)
+    )
+    task_id = cursor.lastrowid
+    conn.commit()
+    
+    # Get the created task
+    created_task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    conn.close()
+    return dict(created_task)
+
+@app.get("/tasks/{task_id}", response_model=Task)
+async def get_task(task_id: int):
+    """Get a specific task"""
+    conn = get_db_connection()
+    task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    conn.close()
+    
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return dict(task)
+
+@app.put("/tasks/{task_id}", response_model=Task)
+async def update_task(task_id: int, task_update: TaskUpdate):
+    """Update a task"""
+    conn = get_db_connection()
+    
+    # Check if task exists
+    existing_task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if existing_task is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Update fields
+    update_fields = []
+    values = []
+    
+    if task_update.title is not None:
+        update_fields.append("title = ?")
+        values.append(task_update.title)
+    if task_update.description is not None:
+        update_fields.append("description = ?")
+        values.append(task_update.description)
+    if task_update.completed is not None:
+        update_fields.append("completed = ?")
+        values.append(task_update.completed)
+    
+    if update_fields:
+        values.append(task_id)
+        conn.execute(
+            f"UPDATE tasks SET {', '.join(update_fields)} WHERE id = ?",
+            values
+        )
+        conn.commit()
+    
+    # Get updated task
+    updated_task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    conn.close()
+    return dict(updated_task)
+
+@app.delete("/tasks/{task_id}")
+async def delete_task(task_id: int):
+    """Delete a task"""
+    conn = get_db_connection()
+    cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+    
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    return {"message": "Task deleted successfully"}
+
+{% elif metadata.app_type == 'blog' %}
+@app.get("/posts", response_model=List[Post])
+async def get_posts():
+    """Get all blog posts"""
+    conn = get_db_connection()
+    posts = conn.execute("SELECT * FROM posts ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(post) for post in posts]
+
+@app.post("/posts", response_model=Post)
+async def create_post(post: PostCreate):
+    """Create a new blog post"""
+    conn = get_db_connection()
+    cursor = conn.execute(
+        "INSERT INTO posts (title, content, author) VALUES (?, ?, ?)",
+        (post.title, post.content, post.author)
+    )
+    post_id = cursor.lastrowid
+    conn.commit()
+    
+    # Get the created post
+    created_post = conn.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
+    conn.close()
+    return dict(created_post)
+
+@app.get("/posts/{post_id}", response_model=Post)
+async def get_post(post_id: int):
+    """Get a specific blog post"""
+    conn = get_db_connection()
+    post = conn.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
+    conn.close()
+    
+    if post is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return dict(post)
+
+@app.delete("/posts/{post_id}")
+async def delete_post(post_id: int):
+    """Delete a blog post"""
+    conn = get_db_connection()
+    cursor = conn.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+    conn.commit()
+    conn.close()
+    
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    return {"message": "Post deleted successfully"}
+
+{% elif metadata.app_type == 'note' %}
+@app.get("/notes", response_model=List[Note])
+async def get_notes():
+    """Get all notes"""
+    conn = get_db_connection()
+    notes = conn.execute("SELECT * FROM notes ORDER BY updated_at DESC").fetchall()
+    conn.close()
+    return [dict(note) for note in notes]
+
+@app.post("/notes", response_model=Note)
+async def create_note(note: NoteCreate):
+    """Create a new note"""
+    conn = get_db_connection()
+    cursor = conn.execute(
+        "INSERT INTO notes (title, content) VALUES (?, ?)",
+        (note.title, note.content)
+    )
+    note_id = cursor.lastrowid
+    conn.commit()
+    
+    # Get the created note
+    created_note = conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
+    conn.close()
+    return dict(created_note)
+
+@app.put("/notes/{note_id}", response_model=Note)
+async def update_note(note_id: int, note_update: NoteUpdate):
+    """Update a note"""
+    conn = get_db_connection()
+    
+    # Check if note exists
+    existing_note = conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
+    if existing_note is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    # Update fields
+    update_fields = ["updated_at = CURRENT_TIMESTAMP"]
+    values = []
+    
+    if note_update.title is not None:
+        update_fields.append("title = ?")
+        values.append(note_update.title)
+    if note_update.content is not None:
+        update_fields.append("content = ?")
+        values.append(note_update.content)
+    
+    values.append(note_id)
+    conn.execute(
+        f"UPDATE notes SET {', '.join(update_fields)} WHERE id = ?",
+        values
+    )
+    conn.commit()
+    
+    # Get updated note
+    updated_note = conn.execute("SELECT * FROM notes WHERE id = ?", (note_id,)).fetchone()
+    conn.close()
+    return dict(updated_note)
+
+@app.delete("/notes/{note_id}")
+async def delete_note(note_id: int):
+    """Delete a note"""
+    conn = get_db_connection()
+    cursor = conn.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+    conn.commit()
+    conn.close()
+    
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    return {"message": "Note deleted successfully"}
+
+{% else %}
+@app.get("/items", response_model=List[Item])
+async def get_items():
+    """Get all items"""
+    conn = get_db_connection()
+    items = conn.execute("SELECT * FROM items ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(item) for item in items]
+
+@app.post("/items", response_model=Item)
+async def create_item(item: ItemCreate):
+    """Create a new item"""
+    conn = get_db_connection()
+    cursor = conn.execute(
+        "INSERT INTO items (name, description) VALUES (?, ?)",
+        (item.name, item.description)
+    )
+    item_id = cursor.lastrowid
+    conn.commit()
+    
+    # Get the created item
+    created_item = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+    conn.close()
+    return dict(created_item)
+
+@app.delete("/items/{item_id}")
+async def delete_item(item_id: int):
+    """Delete an item"""
+    conn = get_db_connection()
+    cursor = conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+    conn.commit()
+    conn.close()
+    
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    return {"message": "Item deleted successfully"}
+{% endif %}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

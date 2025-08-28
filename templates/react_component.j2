@@ -1,0 +1,210 @@
+const {{ metadata.app_type.title() }}Component = ({ {{ metadata.app_type }}s, loading, onAdd, {% if metadata.app_type == 'todo' %}onToggle, {% endif %}onDelete }) => {
+    {% if metadata.app_type == 'todo' %}
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskDescription, setNewTaskDescription] = useState('');
+    {% elif metadata.app_type == 'blog' %}
+    const [newPostTitle, setNewPostTitle] = useState('');
+    const [newPostContent, setNewPostContent] = useState('');
+    const [newPostAuthor, setNewPostAuthor] = useState('');
+    {% elif metadata.app_type == 'note' %}
+    const [newNoteTitle, setNewNoteTitle] = useState('');
+    const [newNoteContent, setNewNoteContent] = useState('');
+    {% else %}
+    const [newItemName, setNewItemName] = useState('');
+    const [newItemDescription, setNewItemDescription] = useState('');
+    {% endif %}
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        {% if metadata.app_type == 'todo' %}
+        if (newTaskTitle.trim()) {
+            onAdd(newTaskTitle.trim(), newTaskDescription.trim());
+            setNewTaskTitle('');
+            setNewTaskDescription('');
+        }
+        {% elif metadata.app_type == 'blog' %}
+        if (newPostTitle.trim() && newPostContent.trim()) {
+            onAdd(newPostTitle.trim(), newPostContent.trim(), newPostAuthor.trim() || 'Admin');
+            setNewPostTitle('');
+            setNewPostContent('');
+            setNewPostAuthor('');
+        }
+        {% elif metadata.app_type == 'note' %}
+        if (newNoteTitle.trim() && newNoteContent.trim()) {
+            onAdd(newNoteTitle.trim(), newNoteContent.trim());
+            setNewNoteTitle('');
+            setNewNoteContent('');
+        }
+        {% else %}
+        if (newItemName.trim()) {
+            onAdd(newItemName.trim(), newItemDescription.trim());
+            setNewItemName('');
+            setNewItemDescription('');
+        }
+        {% endif %}
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Add new {{ metadata.app_type }} form */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold mb-4">Add New {{ metadata.app_type.title() }}</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    {% if metadata.app_type == 'todo' %}
+                    <input
+                        type="text"
+                        placeholder="Task title"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                    />
+                    <textarea
+                        placeholder="Task description (optional)"
+                        value={newTaskDescription}
+                        onChange={(e) => setNewTaskDescription(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows="3"
+                    />
+                    {% elif metadata.app_type == 'blog' %}
+                    <input
+                        type="text"
+                        placeholder="Post title"
+                        value={newPostTitle}
+                        onChange={(e) => setNewPostTitle(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                    />
+                    <input
+                        type="text"
+                        placeholder="Author (optional)"
+                        value={newPostAuthor}
+                        onChange={(e) => setNewPostAuthor(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <textarea
+                        placeholder="Post content"
+                        value={newPostContent}
+                        onChange={(e) => setNewPostContent(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows="6"
+                        required
+                    />
+                    {% elif metadata.app_type == 'note' %}
+                    <input
+                        type="text"
+                        placeholder="Note title"
+                        value={newNoteTitle}
+                        onChange={(e) => setNewNoteTitle(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                    />
+                    <textarea
+                        placeholder="Note content"
+                        value={newNoteContent}
+                        onChange={(e) => setNewNoteContent(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows="6"
+                        required
+                    />
+                    {% else %}
+                    <input
+                        type="text"
+                        placeholder="Item name"
+                        value={newItemName}
+                        onChange={(e) => setNewItemName(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                    />
+                    <textarea
+                        placeholder="Item description (optional)"
+                        value={newItemDescription}
+                        onChange={(e) => setNewItemDescription(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows="3"
+                    />
+                    {% endif %}
+                    <button
+                        type="submit"
+                        className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        Add {{ metadata.app_type.title() }}
+                    </button>
+                </form>
+            </div>
+
+            {/* {{ metadata.app_type }}s list */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold mb-4">{{ metadata.app_type.title() }}s</h2>
+                
+                {loading ? (
+                    <div className="text-center py-4">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                        <p className="mt-2 text-gray-600">Loading...</p>
+                    </div>
+                ) : {{ metadata.app_type }}s.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">No {{ metadata.app_type }}s found. Add one above!</p>
+                ) : (
+                    <div className="space-y-3">
+                        { {{ metadata.app_type }}s.map(({{ metadata.app_type }}) => (
+                            <div key={ {{ metadata.app_type }}.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        {% if metadata.app_type == 'todo' %}
+                                        <div className="flex items-center space-x-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={task.completed}
+                                                onChange={() => onToggle(task.id, task.completed)}
+                                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                            />
+                                            <h3 className={`text-lg font-medium ${task.completed ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                                                {task.title}
+                                            </h3>
+                                        </div>
+                                        {task.description && (
+                                            <p className={`mt-2 ml-7 ${task.completed ? 'text-gray-400' : 'text-gray-600'}`}>
+                                                {task.description}
+                                            </p>
+                                        )}
+                                        <p className="mt-2 ml-7 text-sm text-gray-400">
+                                            Created: {new Date(task.created_at).toLocaleDateString()}
+                                        </p>
+                                        {% elif metadata.app_type == 'blog' %}
+                                        <h3 className="text-lg font-medium text-gray-900">{post.title}</h3>
+                                        <p className="mt-1 text-sm text-gray-500">By {post.author} • {new Date(post.created_at).toLocaleDateString()}</p>
+                                        <p className="mt-2 text-gray-600">{post.content.substring(0, 200)}{post.content.length > 200 ? '...' : ''}</p>
+                                        {% elif metadata.app_type == 'note' %}
+                                        <h3 className="text-lg font-medium text-gray-900">{note.title}</h3>
+                                        <p className="mt-2 text-gray-600">{note.content.substring(0, 150)}{note.content.length > 150 ? '...' : ''}</p>
+                                        <p className="mt-2 text-sm text-gray-400">
+                                            Updated: {new Date(note.updated_at).toLocaleDateString()}
+                                        </p>
+                                        {% else %}
+                                        <h3 className="text-lg font-medium text-gray-900">{item.name}</h3>
+                                        {item.description && (
+                                            <p className="mt-2 text-gray-600">{item.description}</p>
+                                        )}
+                                        <p className="mt-2 text-sm text-gray-400">
+                                            Created: {new Date(item.created_at).toLocaleDateString()}
+                                        </p>
+                                        {% endif %}
+                                    </div>
+                                    <button
+                                        onClick={() => onDelete({{ metadata.app_type }}.id)}
+                                        className="ml-4 text-red-500 hover:text-red-700 focus:outline-none"
+                                        title="Delete {{ metadata.app_type }}"
+                                    >
+                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
