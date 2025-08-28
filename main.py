@@ -1,82 +1,63 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from models import AppIdeaRequest, GeneratedAppResponse
-from code_generator import CodeGenerator
-import logging
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from pydantic import BaseModel
+from typing import Dict
 
 app = FastAPI(
-    title="Zulu AI - App Builder Service",
-    description="Generate structured app starter code based on user ideas",
+    title="Zulu AI - App Generator API",
+    description="Generate app starter code from ideas",
     version="1.0.0"
 )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+class AppIdeaRequest(BaseModel):
+    idea: str
 
-# Initialize code generator
-code_generator = CodeGenerator()
+class AppGeneratorResponse(BaseModel):
+    frontend: Dict[str, str]
+    backend: Dict[str, str]
+    readme: str
 
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    return {"message": "Zulu AI App Builder Service is running"}
+    return {"message": "Zulu AI App Generator API is running"}
 
-@app.post("/generate_app", response_model=GeneratedAppResponse)
+@app.post("/generate_app", response_model=AppGeneratorResponse)
 async def generate_app(request: AppIdeaRequest):
     """
-    Generate structured app starter code based on user's app idea.
+    Generate app starter code based on user idea
     
     Args:
-        request: AppIdeaRequest containing the app idea description
+        request: AppIdeaRequest containing the app idea
         
     Returns:
-        GeneratedAppResponse with generated code files
+        AppGeneratorResponse with generated code files
     """
-    try:
-        logger.info(f"Generating app for idea: {request.idea[:100]}...")
-        
-        # Validate input
-        if not request.idea or len(request.idea.strip()) < 5:
-            raise HTTPException(
-                status_code=400, 
-                detail="App idea must be at least 5 characters long"
-            )
-        
-        # Generate code based on the idea
-        generated_files = code_generator.generate_app_code(request.idea)
-        
-        logger.info(f"Successfully generated {len(generated_files)} files")
-        
-        return GeneratedAppResponse(
-            success=True,
-            message="App code generated successfully",
-            files=generated_files
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error generating app: {str(e)}")
+    # Validate input
+    if not request.idea or len(request.idea.strip()) == 0:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate app code: {str(e)}"
+            status_code=400,
+            detail="App idea cannot be empty"
         )
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for monitoring"""
-    return {"status": "healthy", "service": "zulu-ai-app-builder"}
+    
+    idea = request.idea.strip()
+    
+    # Generate placeholder code
+    frontend_files = {
+        "App.js": "// React code placeholder"
+    }
+    
+    backend_files = {
+        "main.py": "# FastAPI backend placeholder"
+    }
+    
+    readme_content = f"# {idea}\n\nGenerated app starter by Zulu AI"
+    
+    return AppGeneratorResponse(
+        frontend=frontend_files,
+        backend=backend_files,
+        readme=readme_content
+    )
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=5000)
