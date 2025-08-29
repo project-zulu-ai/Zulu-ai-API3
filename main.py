@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from models import AppIdea
 from code_generator import generate_app
 from agent_action import save_files_and_push
-from utils.git_helper import git_push
+from utils.git_helper import git_workflow
 import logging
 
 # Set up logging
@@ -14,6 +14,9 @@ app = FastAPI(
     description="Generate app starter code from ideas, save files, and push to GitHub",
     version="1.0.0"
 )
+
+# Repository URL
+repo_url = "https://github.com/project-zulu-ai/Zulu-ai-api.git"
 
 @app.get("/")
 async def root():
@@ -48,28 +51,16 @@ async def generate_app_endpoint(app_idea: AppIdea):
         commit_message = f"Generated app starter: {app_idea.idea[:50]}{'...' if len(app_idea.idea) > 50 else ''}"
         save_result = save_files_and_push(generated_files, commit_message)
         
-        # Push to GitHub (don't block if this fails)
-        repo_url = "https://github.com/USERNAME/zulu-ai-api.git"  # Replace with actual username later
-        git_status = {"status": "skipped", "message": "Git operations disabled"}
-        
-        try:
-            logger.info("Attempting to push to GitHub...")
-            git_status = git_push(repo_url, commit_message)
-            logger.info(f"Git push result: {git_status}")
-        except Exception as git_error:
-            logger.error(f"Git push failed but continuing: {git_error}")
-            git_status = {
-                "status": "error", 
-                "message": f"Git push failed: {str(git_error)}"
-            }
+        # Run Git workflow to push to GitHub
+        git_status = git_workflow(repo_url, commit_message=f"Generated app for idea: {app_idea.idea}")
         
         # Return comprehensive response
         return {
             "idea": app_idea.idea,
             "files": generated_files,
-            "summary": f"Generated {len(generated_files)} files for idea: {app_idea.idea}",
             "file_operations": save_result,
-            "git_status": git_status
+            "git_status": git_status,
+            "summary": f"Generated {len(generated_files)} files and pushed to GitHub"
         }
         
     except Exception as e:

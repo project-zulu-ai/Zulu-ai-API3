@@ -1,4 +1,4 @@
-# Task management app
+# Portfolio website builder
 
 Generated app starter by Zulu AI
 
