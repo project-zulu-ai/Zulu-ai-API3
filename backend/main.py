@@ -1,51 +1,60 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import sqlite3
-from typing import List
+    from fastapi import FastAPI, HTTPException
+    from models import AppIdea
+    from code_generator import generate_app
+    from utils.git_helper import git_workflow  # ✅ use git helper
 
-app = FastAPI()
+    app = FastAPI(
+        title="Zulu AI - App Generator API",
+        description="Generate app starter code from ideas and automatically save & push to GitHub",
+        version="1.0.0"
+    )
 
-# Database setup
-def init_db():
-    conn = sqlite3.connect("app.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
+    @app.get("/")
+    async def root():
+        """Health check endpoint"""
+        return {"message": "Zulu AI App Generator API is running"}
 
-init_db()
+    @app.post("/generate_app")
+    async def generate_app_endpoint(app_idea: AppIdea):
+        """
+        Generate app starter code based on user idea, save files, and push to GitHub.
+        """
+        if not app_idea.idea or len(app_idea.idea.strip()) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="App idea cannot be empty"
+            )
 
-class Item(BaseModel):
-    name: str
+        try:
+            # 1. Generate the app files
+            generated_files = generate_app(app_idea.idea.strip())
 
-@app.get("/")
-async def root():
-    return {"message": "API is running"}
+            # 2. Save generated files locally
+            for path, content in generated_files.items():
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(content)
 
-@app.get("/items")
-async def get_items():
-    conn = sqlite3.connect("app.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM items")
-    items = cursor.fetchall()
-    conn.close()
-    return [{"id": item[0], "name": item[1]} for item in items]
+            # 3. Run Git workflow (push to repo)
+            commit_message = f"Generated app starter: {app_idea.idea[:50]}{'...' if len(app_idea.idea) > 50 else ''}"
+            git_status = git_workflow(
+                repo_url="https://github.com/project-zulu-ai/Zulu-ai-api.git",
+                commit_message=commit_message
+            )
 
-@app.post("/items")
-async def create_item(item: Item):
-    conn = sqlite3.connect("app.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO items (name) VALUES (?)", (item.name,))
-    conn.commit()
-    conn.close()
-    return {"message": "Item created successfully"}
+            # 4. Return structured response
+            return {
+                "idea": app_idea.idea,
+                "files": generated_files,
+                "git_status": git_status,
+                "summary": f"Generated {len(generated_files)} files and pushed to GitHub"
+            }
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to generate app: {str(e)}"
+            )
+
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=5000)
