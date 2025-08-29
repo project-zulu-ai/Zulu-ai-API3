@@ -1,53 +1,52 @@
-# Zulu AI App Generator API
+# Simple expense tracker app
 
-A FastAPI service that generates app starter code based on user ideas.
+Generated app starter by Zulu AI
 
-## Setup
+## Project Structure
 
-1. Install dependencies:
-```bash
-pip install fastapi uvicorn
+```
+frontend/          # React frontend
+├── App.js        # Main React component
+backend/          # FastAPI backend  
+├── main.py       # API server
+README.md         # This file
 ```
 
-2. Run the server:
+## Setup Instructions
+
+### Backend Setup
+
+1. Install Python dependencies:
 ```bash
+pip install fastapi uvicorn sqlite3
+```
+
+2. Run the API server:
+```bash
+cd backend
 python main.py
 ```
 
-The API will be available at `http://localhost:5000`
+The API will be available at `http://localhost:8000`
 
-## Usage
+### Frontend Setup
 
-### Generate App Code
-
-**Endpoint:** `POST /generate_app`
-
-**Request:**
-```json
-{
-  "idea": "Your app idea description"
-}
+1. Install Node.js dependencies:
+```bash
+cd frontend
+npm install react react-dom
+npm install -D tailwindcss
 ```
 
-**Response:**
-```json
-{
-  "frontend": {
-    "App.js": "// React code placeholder"
-  },
-  "backend": {
-    "main.py": "# FastAPI backend placeholder"
-  },
-  "readme": "# Your app idea\n\nGenerated app starter by Zulu AI"
-}
+2. Start the development server:
+```bash
+npm start
 ```
 
-### Health Check
+The app will be available at `http://localhost:3000`
 
-**Endpoint:** `GET /`
+## API Endpoints
 
-Returns API status information.
-
-## API Documentation
-
-Once running, visit `http://localhost:5000/docs` for interactive API documentation.
+- `GET /` - Health check
+- `GET /items` - Get all items
+- `POST /items` - Create new item
