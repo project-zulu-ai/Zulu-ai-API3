@@ -1,4 +1,4 @@
-# Simple expense tracker app
+# Task management app
 
 Generated app starter by Zulu AI
 
